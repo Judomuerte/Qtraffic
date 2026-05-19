@@ -37,4 +37,3 @@ ArduinoApps/wifi/
     └── sketch.ino   # runs on the MCU, drives the LED matrix
 ```
 
-![Qtraffic](https://user-images.githubusercontent.com/https://github.com/user-attachments/assets/9d3725f3-0fe5-404e-a709-6a6aa6bb3b60)
