@@ -8,7 +8,7 @@ from collections import deque
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────────────────────────
-OPNSENSE_HOST   = "192.168.0.1"
+OPNSENSE_HOST   = "Opnsense IP"
 OPNSENSE_KEY    = "api_key"
 OPNSENSE_SECRET = "api_secret"
 OPNSENSE_IFACE  = "interface_name"
