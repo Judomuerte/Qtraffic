@@ -19,7 +19,7 @@ Edit the config block at the top of `ArduinoApps/wifi/python/main.py`:
 OPNSENSE_HOST   = "Opnsense_IP"
 OPNSENSE_KEY    = "YOUR_API_KEY"
 OPNSENSE_SECRET = "YOUR_API_SECRET"
-OPNSENSE_IFACE  = "igc1"
+OPNSENSE_IFACE  = "wan_interface"
 ```
 
 To get API credentials go to **System → Access → Users** in OPNsense, edit your user, scroll to **API keys** and click **+**. Make sure the user has Diagnostics privileges.
