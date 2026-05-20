@@ -1,21 +1,20 @@
 /*
-  sketch/sketch.ino  —  LED matrix renderer (MCU / STM32 side)
+  sketch/sketch.ino  —  LED matrix + Modulino Vibro (MCU side)
 
-  Receives scaled RX and TX values (each 0-4) from the Python side via
-  Router Bridge, pushes them into a 13-column scrolling history, and
-  renders a split waveform on the 8x13 LED matrix:
+  Receives scaled RX/TX values (0-4) from Python via Router Bridge.
+  Renders split waveform on 8x13 LED matrix and buzzes the Vibro on level 4.
 
-    Rows 0-3  →  TX (outbound), bar grows DOWN from row 0
-    Rows 4-7  →  RX (inbound),  bar grows UP   from row 7
-
-  While waiting for the first data from Python, a slow idle pulse runs
-  on the two centre rows so the matrix isn't blank during boot.
+  Level 4 = alarm: 10x above baseline traffic — sustained spike.
+  RX spike = 2 short buzzes (unexpected inbound)
+  TX spike  = 3 short buzzes (something phoning home)
 */
 
 #include <Arduino_RouterBridge.h>
 #include <Arduino_LED_Matrix.h>
+#include <Modulino.h>
 
 ArduinoLEDMatrix matrix;
+ModulinoVibro vibro;
 
 const uint8_t ROWS = 8;
 const uint8_t COLS = 13;
@@ -32,8 +31,7 @@ bool  hasData   = false;
 float idlePhase = 0.0f;
 unsigned long lastRender = 0;
 
-// ── Bridge RPC handler ──────────────────────────────────────────────────────
-// Python calls:  Bridge.call("updateTraffic", rx_int, tx_int)
+// ── Bridge RPC handler ───────────────────────────────────────────────────────
 bool updateTraffic(int rx, int tx) {
   pendingRx = (uint8_t)constrain(rx, 0, 4);
   pendingTx = (uint8_t)constrain(tx, 0, 4);
@@ -41,7 +39,7 @@ bool updateTraffic(int rx, int tx) {
   return true;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 inline void setPixel(uint8_t row, uint8_t col, uint8_t val) {
   if (row < ROWS && col < COLS)
     frame[row * COLS + col] = val;
@@ -61,7 +59,6 @@ void renderTraffic() {
   for (int col = 0; col < COLS; col++) {
     uint8_t txH = txHistory[col];
     for (uint8_t r = 0; r < txH; r++) setPixel(r, col, 255);
-
     uint8_t rxH = rxHistory[col];
     for (uint8_t r = 7; r > (7u - rxH); r--) setPixel(r, col, 255);
   }
@@ -79,26 +76,53 @@ void renderIdle() {
   matrix.draw(frame);
 }
 
-// ── Setup / Loop ─────────────────────────────────────────────────────────────
+// ── Vibro alert patterns ─────────────────────────────────────────────────────
+void buzzRxAlarm() {
+  // 2 short buzzes — unexpected inbound spike
+  vibro.on(150, true);
+  delay(100);
+  vibro.on(150, true);
+}
+
+void buzzTxAlarm() {
+  // 3 short buzzes — something phoning home
+  vibro.on(150, true);
+  delay(100);
+  vibro.on(150, true);
+  delay(100);
+  vibro.on(150, true);
+}
+
+// ── Setup / Loop ──────────────────────────────────────────────────────────────
 void setup() {
   Monitor.begin();
+  Modulino.begin();
   matrix.begin();
   matrix.setGrayscaleBits(8);
+  vibro.begin();
 
-  // provide_safe() fires the callback safely on the main thread
-  // when update_safe() is called in loop()
   Bridge.provide("updateTraffic", updateTraffic);
+
+  // Quick confirmation buzz on boot
+  vibro.on(200, true);
 
   Monitor.println("[wave_matrix] ready");
 }
 
 void loop() {
-  delay(10);
+  Bridge.update();
 
   if (newData) {
     newData = false;
     hasData = true;
+
+    bool rxAlarm = (pendingRx == 4);
+    bool txAlarm = (pendingTx == 4);
+
     scrollAndPush(pendingRx, pendingTx);
+
+    if (rxAlarm) buzzRxAlarm();
+    else if (txAlarm) buzzTxAlarm();
   }
 
   unsigned long now = millis();
